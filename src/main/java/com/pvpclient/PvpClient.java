@@ -22,6 +22,7 @@ import com.pvpclient.module.visual.FreecamModule;
 import com.pvpclient.module.visual.PlayerEspModule;
 import com.pvpclient.module.visual.PlayerInfoModule;
 import net.fabricmc.api.ClientModInitializer;
+import com.pvpclient.module.visual.VanishDetectorModule;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -66,12 +67,14 @@ public final class PvpClient implements ClientModInitializer {
         modules.register(new AutoHealModule());
         modules.register(new AutoBuffModule());
         modules.register(new EnderPearlTrainerModule());
+        modules.register(new TargetStrafeModule());
         // Visuals
         modules.register(new PlayerEspModule());
         modules.register(new ChestEspModule());
         modules.register(new FreecamModule());
         modules.register(new BlockTrailModule());
         modules.register(new PlayerInfoModule());
+        modules.register(new VanishDetectorModule());
         // HUD
         modules.register(new CpsModule());
         modules.register(new FpsModule());
