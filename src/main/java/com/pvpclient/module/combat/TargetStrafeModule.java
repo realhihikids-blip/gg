@@ -2,7 +2,6 @@ package com.pvpclient.module.combat;
 
 import com.pvpclient.module.Category;
 import com.pvpclient.module.ClientModule;
-import com.pvpclient.util.AimSmoother;
 import net.minecraft.entity.Entity;
 
 public class TargetStrafeModule extends ClientModule {
@@ -18,7 +17,7 @@ public class TargetStrafeModule extends ClientModule {
     public void onTick() {
         if (!this.isActive() || mc.player == null) return;
 
-        // 1. Универсальная проверка зажатия клавиши "Вперед"
+        // 1. ФУНКЦИЯ АВТО-БЕГА (AutoSprint)
         if (mc.options.forwardKey.isPressed() && !mc.player.isSneaking()) {
             mc.player.setSprinting(true);
         }
@@ -37,7 +36,8 @@ public class TargetStrafeModule extends ClientModule {
         }
 
         if (mc.player.distanceTo(target) <= radius + 1.5) {
-            float yaw = AimSmoother.silentYaw;
+            // ИСПРАВЛЕНО: берём текущий yaw игрока напрямую для стабильной работы
+            float yaw = mc.player.getYaw();
             double moveYaw = Math.toRadians(yaw + (direction ? 90 : -90));
             
             mc.player.setVelocity(
