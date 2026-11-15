@@ -47,9 +47,8 @@ public final class KillAuraModule extends ClientModule {
         
         sinceHit++;
 
-        // Поиск подходящей цели по FOV и дистанции
-        double attackFov = fov.get();
-        LivingEntity victim = CombatUtil.findTarget(mc, range.get(), attackFov, 2, !throughWalls.get(), false);
+        // ИСПРАВЛЕНО: передаем ровно 5 аргументов, как требует твой CombatUtil
+        LivingEntity victim = CombatUtil.findTarget(mc, range.get(), fov.get(), 0, !throughWalls.get());
         this.target = victim;
 
         if (victim == null) {
