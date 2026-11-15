@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "pvpclient",
+  "version": "${version}",
+  "name": "PvP Client",
+  "description": "Customizable PvP client with a ClickGUI, HUD widgets and a player info ESP, restricted to private test worlds.",
+  "authors": ["You"],
+  "license": "MIT",
+  "environment": "client",
+  "mixins": ["pvpclient.mixins.json"],
+  "entrypoints": {
+    "client": ["com.pvpclient.PvpClient"]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.10",
+    "minecraft": "~1.21.4",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
