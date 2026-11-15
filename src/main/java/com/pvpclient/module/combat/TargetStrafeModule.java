@@ -18,8 +18,8 @@ public class TargetStrafeModule extends ClientModule {
     public void onTick() {
         if (!this.isActive() || mc.player == null) return;
 
-        // 1. ФУНКЦИЯ АВТО-БЕГА (AutoSprint)
-        if (mc.player.input.pressingForward && !mc.player.isSneaking()) {
+        // 1. Универсальная проверка зажатия клавиши "Вперед"
+        if (mc.options.forwardKey.isPressed() && !mc.player.isSneaking()) {
             mc.player.setSprinting(true);
         }
 

@@ -6,24 +6,27 @@ public final class AimSmoother {
     private double yaw, pitch;
     private boolean ready;
 
-    // ПЕРЕМЕННЫЕ ДЛЯ ТИХОГО РЕЖИМА (Silent)
+    // Переменные для тихого режима
     public static float silentYaw;
     public static float silentPitch;
     public static boolean isSilentRotating = false;
 
-    // Включает тихую ротацию (сервер видит углы, а твой экран — нет)
     public static void setSilentRotation(float yaw, float pitch) {
         silentYaw = yaw;
         silentPitch = pitch;
         isSilentRotating = true;
     }
 
-    // Выключает тихую ротацию
     public static void resetSilent() {
         isSilentRotating = false;
     }
 
-    // --- Оригинальный код Клода (сохраняем, чтобы ничего не сломать) ---
+    // Совместимость со старыми и новыми вызовами одновременно
+    public float yaw() { return (float) yaw; }
+    public float pitch() { return (float) pitch; }
+    public float getYaw() { return (float) yaw; }
+    public float getPitch() { return (float) pitch; }
+
     public void snap(float targetYaw, float targetPitch) {
         this.yaw = targetYaw;
         this.pitch = targetPitch;
@@ -38,7 +41,4 @@ public final class AimSmoother {
         yaw += MathHelper.wrapDegrees((float) (targetYaw - yaw)) * factor;
         pitch += (targetPitch - pitch) * factor;
     }
-
-    public float getYaw() { return (float) yaw; }
-    public float getPitch() { return (float) pitch; }
 }
