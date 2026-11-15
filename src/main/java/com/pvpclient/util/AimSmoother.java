@@ -6,22 +6,6 @@ public final class AimSmoother {
     private double yaw, pitch;
     private boolean ready;
 
-    // Переменные для тихого режима
-    public static float silentYaw;
-    public static float silentPitch;
-    public static boolean isSilentRotating = false;
-
-    public static void setSilentRotation(float yaw, float pitch) {
-        silentYaw = yaw;
-        silentPitch = pitch;
-        isSilentRotating = true;
-    }
-
-    public static void resetSilent() {
-        isSilentRotating = false;
-    }
-
-    // Совместимость со старыми и новыми вызовами одновременно
     public float yaw() { return (float) yaw; }
     public float pitch() { return (float) pitch; }
     public float getYaw() { return (float) yaw; }
