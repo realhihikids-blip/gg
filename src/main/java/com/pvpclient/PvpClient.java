@@ -11,6 +11,7 @@ import com.pvpclient.module.combat.HitboxModule;
 import com.pvpclient.module.combat.TargetLockModule;
 import com.pvpclient.module.combat.KillAuraModule;
 import com.pvpclient.module.combat.TriggerBotModule;
+import com.pvpclient.module.combat.TargetStrafeModule;
 import com.pvpclient.module.hud.CpsModule;
 import com.pvpclient.module.hud.DirectionIndicatorsModule;
 import com.pvpclient.module.hud.FpsModule;
