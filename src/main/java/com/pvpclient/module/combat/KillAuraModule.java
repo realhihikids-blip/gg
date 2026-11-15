@@ -8,20 +8,9 @@ import com.pvpclient.setting.NumberSetting;
 import com.pvpclient.util.AimSmoother;
 import com.pvpclient.util.CombatUtil;
 import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.client.render.rendering.v1.WorldRenderContext;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.item.Item;
-import net.minecraft.registry.Registries;
-import net.minecraft.screen.slot.SlotActionType;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
-import java.util.HashSet;
-import java.util.Set;
 
 public final class KillAuraModule extends ClientModule {
     private final BooleanSetting autoHit = add(new BooleanSetting("Auto Hit", true));
@@ -108,12 +97,6 @@ public final class KillAuraModule extends ClientModule {
         CombatUtil.attack(mc, victim);
         sinceHit = 0;
         waitedForCrit = 0;
-    }
-
-    @Override
-    public void onWorldRender(WorldRenderContext ctx) {
-        // МЕТОД ПОЛНОСТЬЮ ОЧИЩЕН ОТ ЛАГАЮЩЕЙ НАВОДКИ КЛОДА!
-        // Камера больше не дергается на уровне отрисовки кадров, убирая микрофризы.
     }
 
     public static boolean canCrit(ClientPlayerEntity p) {
