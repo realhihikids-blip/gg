@@ -1,83 +1,87 @@
 package com.pvpclient.module.combat;
 
-import com.pvpclient.module.Category;
-import com.pvpclient.module.ClientModule;
-import com.pvpclient.setting.BooleanSetting;
-import com.pvpclient.setting.NumberSetting;
-import com.pvpclient.util.AimSmoother;
-import com.pvpclient.util.CombatUtil;
-import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.util.Hand;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
+import java.util.Comparator;
+import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
-public final class KillAuraModule extends ClientModule {
-    private final NumberSetting range = add(new NumberSetting("Attack Range", 3.1, 2.0, 4.5, 0.1));
-    private final NumberSetting fov = add(new NumberSetting("Attack FOV", 120.0, 30.0, 360.0, 5.0));
-    private final NumberSetting smoothSpeed = add(new NumberSetting("Aim Smooth", 15.0, 5.0, 30.0, 1.0));
-    private final BooleanSetting onlyCrits = add(new BooleanSetting("Only Crits", true));
+public class KillAuraModule {
+    
+    // Настройки для ReallyWorld (Обход Vulcan/Matrix)
+    private final double maxReach = 2.92; // Легитная дистанция удара (строго до 3.0!)
+    private final float rotationSpeed = 4.2f; // Скорость доводки камеры
+    
+    private PlayerEntity target;
 
-    private final AimSmoother smoother = new AimSmoother();
-    private int hitTicks = 0;
-    private double randomDelay = 0;
-
-    public KillAuraModule() {
-        super("KillAura", "Плавная киллаура с рандомизацией для обхода Matrix/Vulcan", Category.COMBAT);
-    }
-
-    @Override
-    public void onDisable() {
-        smoother.reset();
-        hitTicks = 0;
-    }
-
-    @Override
+    // Этот метод должен вызываться в каждом тике игры (например, из MixinPlayerEntity или ClientTickEvents)
     public void onTick() {
-        if (mc.player == null || mc.world == null || mc.interactionManager == null) return;
+        var mc = net.minecraft.client.MinecraftClient.getInstance();
+        if (mc.world == null || mc.player == null) return;
 
-        hitTicks++;
+        // 1. Поиск ближайшего живого игрока в радиусе видимости
+        List<PlayerEntity> targets = mc.world.getPlayers().stream()
+                .filter(p -> p != mc.player)
+                .filter(p -> !p.isDead())
+                .filter(p -> p.isAlive())
+                .filter(p -> mc.player.distanceTo(p) <= maxReach + 1.0) // Ищем чуть дальше, чтобы начать доводку заранее
+                .sorted(Comparator.comparingDouble(p -> mc.player.distanceTo(p)))
+                .toList();
 
-        // 1. Ищем цель (передаем 5 параметров под твой сурс)
-        LivingEntity victim = CombatUtil.findTarget(mc, range.get(), fov.get(), 0, true);
-        if (victim == null) {
-            smoother.reset();
+        if (targets.isEmpty()) {
+            target = null;
             return;
         }
 
-        // 2. Рассчитываем углы до хитбокса врага
-        Vec3d eyePos = mc.player.getEyePos();
-        Vec3d targetPoint = victim.getBoundingBox().getCenter();
-        
-        double dX = targetPoint.x - eyePos.x;
-        double dY = targetPoint.y - eyePos.y;
-        double dZ = targetPoint.z - eyePos.z;
-        double horizontal = Math.sqrt(dX * dX + dZ * dZ);
-        
-        float targetYaw = (float) (Math.toDegrees(Math.atan2(dZ, dX)) - 90.0);
-        float targetPitch = (float) (-Math.toDegrees(Math.atan2(dY, horizontal)));
+        target = targets.get(0);
 
-        // 3. Плавное легитное наведение камеры (без дёрганий и крашей пакетов)
-        smoother.towards(targetYaw, targetPitch, smoothSpeed.get(), 0.05);
-        
-        mc.player.setYaw(smoother.getYaw());
-        mc.player.setPitch(smoother.getPitch());
+        // 2. Расчет идеальных углов до хитбокса цели
+        float[] neededRotations = calculateRotations(mc.player.getEyePos(), target.getBoundingBox().getCenter());
 
-        // 4. Проверяем, наведён ли прицел близко к хитбоксу перед атакой
-        float deltaYaw = Math.abs(MathHelper.wrapDegrees(mc.player.getYaw() - targetYaw));
-        if (deltaYaw > 35.0f) return; 
+        // 3. Плавное сглаживание углов с человеческим шумом (ГЛАВНЫЙ ОБХОД)
+        float smoothYaw = smoothAngle(mc.player.getYaw(), neededRotations[0], rotationSpeed);
+        float smoothPitch = smoothAngle(mc.player.getPitch(), neededRotations[1], rotationSpeed);
 
-        // 5. Рандомизация ударов (плавающий кулдаун для обмана Matrix)
-        if (hitTicks >= (10 + randomDelay)) {
-            if (onlyCrits.get() && mc.player.isOnGround()) {
-                mc.player.jump();
-                return;
+        // Добавляем микро-рандомизацию (шум Гаусса), чтобы античит не видел идеальную математику
+        double noise = ThreadLocalRandom.current().nextGaussian() * 0.15;
+        smoothYaw += noise;
+        smoothPitch += noise;
+
+        // Применяем ротации к игроку (они отправятся на сервер с пакетом движения)
+        mc.player.setYaw(smoothYaw);
+        mc.player.setPitch(MathHelper.clamp(smoothPitch, -90.0f, 90.0f));
+
+        // 4. Удар (Атака)
+        // Бьем, только если цель РЕАЛЬНО в радиусе хитбокса и кулдаун атаки полностью заряжен (1.21.4)
+        if (mc.player.distanceTo(target) <= maxReach) {
+            if (mc.player.getAttackCooldownProgress(0.5f) >= 0.95f) {
+                // Имитируем легитный клик мыши через менеджер взаимодействия
+                mc.interactionManager.attackEntity(mc.player, target);
+                mc.player.swingHand(Hand.MAIN_HAND);
             }
-
-            // Наносим удар
-            CombatUtil.attack(mc, victim);
-            
-            // Задаем случайное смещение для следующего удара
-            randomDelay = Math.random() * 3.0; 
-            hitTicks = 0;
         }
+    }
+
+    // Математический расчет углов взгляда на точку
+    private float[] calculateRotations(Vec3d from, Vec3d to) {
+        double diffX = to.x - from.x;
+        double diffY = to.y - from.y;
+        double diffZ = to.z - from.z;
+        double diffXZ = MathHelper.sqrt((float) (diffX * diffX + diffZ * diffZ));
+
+        float yaw = (float) (MathHelper.atan2(diffZ, diffX) * 180.0 / Math.PI) - 90.0f;
+        float pitch = (float) (-(MathHelper.atan2(diffY, diffXZ) * 180.0 / Math.PI));
+
+        return new float[]{yaw, pitch};
+    }
+
+    // Алгоритм плавного изменения угла (кинематика)
+    private float smoothAngle(float current, float target, float speed) {
+        float diff = MathHelper.wrapDegrees(target - current);
+        if (diff > speed) diff = speed;
+        if (diff < -speed) diff = -speed;
+        return current + diff;
     }
 }
