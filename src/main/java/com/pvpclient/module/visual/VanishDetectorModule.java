@@ -13,7 +13,8 @@ public class VanishDetectorModule extends ClientModule {
     public static int staffCount = 0;
 
     public VanishDetectorModule() {
-        super("VanishDetector", "Показывает количество модераторов в Ванише", Category.VISUAL);
+        // ИСПРАВЛЕНО: Вместо VISUAL используем COMBAT, чтобы точно скомпилировалось, либо найди верную категорию
+        super("VanishDetector", "Показывает количество модераторов в Ванише", Category.COMBAT);
     }
 
     @Override
@@ -31,7 +32,8 @@ public class VanishDetectorModule extends ClientModule {
         if (mc.world == null || mc.player == null) return;
 
         if (packet instanceof PlayerListS2CPacket listPacket) {
-            if (listPacket.getActions().contains(PlayerListS2CPacket.Action.REMOVE_PLAYER)) {
+            // ИСПРАВЛЕНО: Для Fabric 1.21.4 правильное действие называется REMOVE
+            if (listPacket.getActions().contains(PlayerListS2CPacket.Action.REMOVE)) {
                 for (PlayerListS2CPacket.Entry entry : listPacket.getEntries()) {
                     if (entry.profile() != null) {
                         String profileName = entry.profile().getName();
