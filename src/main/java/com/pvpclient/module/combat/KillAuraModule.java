@@ -71,11 +71,13 @@ public class KillAuraModule extends ClientModule {
         serverYaw = smoothYaw;
         serverPitch = smoothPitch;
 
-        // 3. Проверка наводки перед ударом (Защита от киков)
-        // Бьем только если прицел РЕАЛЬНО наведен близко к цели (разница меньше 20 градусов)
+       // // 3. Проверка наводки перед ударом (Строгий обход Hitboxes для ReallyWorld)
         float deltaYaw = Math.abs(MathHelper.wrapDegrees(mc.player.getYaw() - neededRotations[0]));
-        if (deltaYaw > 20.0f) return;
+        float deltaPitch = Math.abs(MathHelper.wrapDegrees(mc.player.getPitch() - neededRotations[1]));
 
+        // // Если прицел не долетел до хитбокса (разница больше 12 градусов по горизонтали или вертикали)
+        // // полностью блокируем удар, защищая от кика
+        if (deltaYaw > 12.0f || deltaPitch > 12.0f) return;
         // 4. Удар по кулдауну версии 1.21.4
         if (mc.player.distanceTo(target) <= maxReach) {
             if (mc.player.getAttackCooldownProgress(0.5f) >= 0.95f && hitTicks >= (8 + randomDelay)) {
