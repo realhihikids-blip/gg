@@ -13,7 +13,6 @@ public class VanishDetectorModule extends ClientModule {
     public static int staffCount = 0;
 
     public VanishDetectorModule() {
-        // ИСПРАВЛЕНО: Вместо VISUAL используем COMBAT, чтобы точно скомпилировалось, либо найди верную категорию
         super("VanishDetector", "Показывает количество модераторов в Ванише", Category.COMBAT);
     }
 
@@ -32,13 +31,19 @@ public class VanishDetectorModule extends ClientModule {
         if (mc.world == null || mc.player == null) return;
 
         if (packet instanceof PlayerListS2CPacket listPacket) {
-            // ИСПРАВЛЕНО: Для Fabric 1.21.4 правильное действие называется REMOVE
-            if (listPacket.getActions().contains(PlayerListS2CPacket.Action.REMOVE)) {
+            // ГЛАВНЫЙ ОБХОД: Вместо проверки конкретного Action (REMOVE/UPDATE),
+            // мы просто проверяем, пришел ли не пустой пакет обновления таба.
+            // Если он содержит записи, мы легитно сканируем ники из него.
+            if (listPacket.getEntries() != null && !listPacket.getEntries().isEmpty()) {
                 for (PlayerListS2CPacket.Entry entry : listPacket.getEntries()) {
                     if (entry.profile() != null) {
                         String profileName = entry.profile().getName();
                         if (isStaffNickname(profileName)) {
-                            vanishedStaff.add(profileName);
+                            // Проверяем: если игрока с таким ником больше нет в обычном сетевом списке (TAB)
+                            // значит, этот пакет убрал его, и админ ушел в Ваниш!
+                            if (mc.getNetworkHandler() != null && mc.getNetworkHandler().getPlayerListEntry(entry.profile().getId()) == null) {
+                                vanishedStaff.add(profileName);
+                            }
                         }
                     }
                 }
