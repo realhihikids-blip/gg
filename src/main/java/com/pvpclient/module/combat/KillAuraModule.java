@@ -1,83 +1,101 @@
 package com.pvpclient.module.combat;
 
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
+import com.pvpclient.module.ClientModule; // Импорт базового класса модуля
+import com.pvpclient.module.Category; // Импорт категорий, если нужно
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
-public class KillAuraModule {
+public class KillAuraModule extends ClientModule {
     
-    // Настройки для ReallyWorld (Обход Vulcan/Matrix)
-    private final double maxReach = 2.92; // Легитная дистанция удара (строго до 3.0!)
-    private final float rotationSpeed = 4.2f; // Скорость доводки камеры
-    
-    private PlayerEntity target;
+    // Переменные для CameraMixin и Silent наводки
+    public static boolean isActive = false;
+    public static boolean hasTarget = false;
+    public static float serverYaw;
+    public static float serverPitch;
 
-    // Этот метод должен вызываться в каждом тике игры (например, из MixinPlayerEntity или ClientTickEvents)
+    private final double maxReach = 2.92;
+    private final float rotationSpeed = 4.2f;
+    private AbstractClientPlayerEntity target;
+    private int hitTicks = 0;
+    private double randomDelay = 0;
+
+    // Конструктор модуля (исправляет ошибку регистрации)
+    public KillAuraModule() {
+        super("KillAura", "Автоматически бьет игроков вокруг", Category.COMBAT);
+    }
+
+    @Override
     public void onTick() {
+        hitTicks++;
         var mc = net.minecraft.client.MinecraftClient.getInstance();
-        if (mc.world == null || mc.player == null) return;
+        if (mc.world == null || mc.player == null) {
+            isActive = false;
+            hasTarget = false;
+            return;
+        }
 
-        // 1. Поиск ближайшего живого игрока в радиусе видимости
-        List<PlayerEntity> targets = mc.world.getPlayers().stream()
+        // Ищем игроков с правильным типом данных Fabric
+        List<AbstractClientPlayerEntity> targets = mc.world.getPlayers().stream()
                 .filter(p -> p != mc.player)
-                .filter(p -> !p.isDead())
                 .filter(p -> p.isAlive())
-                .filter(p -> mc.player.distanceTo(p) <= maxReach + 1.0) // Ищем чуть дальше, чтобы начать доводку заранее
+                .filter(p -> mc.player.distanceTo(p) <= maxReach + 1.0)
                 .sorted(Comparator.comparingDouble(p -> mc.player.distanceTo(p)))
                 .toList();
 
         if (targets.isEmpty()) {
             target = null;
+            hasTarget = false;
+            isActive = false;
             return;
         }
 
         target = targets.get(0);
+        isActive = true;
+        hasTarget = true;
 
-        // 2. Расчет идеальных углов до хитбокса цели
+        // Расчет углов
         float[] neededRotations = calculateRotations(mc.player.getEyePos(), target.getBoundingBox().getCenter());
 
-        // 3. Плавное сглаживание углов с человеческим шумом (ГЛАВНЫЙ ОБХОД)
+        // Сглаживание
         float smoothYaw = smoothAngle(mc.player.getYaw(), neededRotations[0], rotationSpeed);
         float smoothPitch = smoothAngle(mc.player.getPitch(), neededRotations[1], rotationSpeed);
 
-        // Добавляем микро-рандомизацию (шум Гаусса), чтобы античит не видел идеальную математику
         double noise = ThreadLocalRandom.current().nextGaussian() * 0.15;
-        smoothYaw += noise;
-        smoothPitch += noise;
+        serverYaw = smoothYaw + (float) noise;
+        serverPitch = MathHelper.clamp(smoothPitch + (float) noise, -90.0f, 90.0f);
 
-        // Применяем ротации к игроку (они отправятся на сервер с пакетом движения)
-        mc.player.setYaw(smoothYaw);
-        mc.player.setPitch(MathHelper.clamp(smoothPitch, -90.0f, 90.0f));
-
-        // 4. Удар (Атака)
-        // Бьем, только если цель РЕАЛЬНО в радиусе хитбокса и кулдаун атаки полностью заряжен (1.21.4)
+        // Удар с обходом ReallyWorld
         if (mc.player.distanceTo(target) <= maxReach) {
-            if (mc.player.getAttackCooldownProgress(0.5f) >= 0.95f) {
-                // Имитируем легитный клик мыши через менеджер взаимодействия
+            if (mc.player.getAttackCooldownProgress(0.5f) >= 0.95f && hitTicks >= (10 + randomDelay)) {
+                
+                if (mc.player.isUsingItem()) {
+                    mc.interactionManager.stopUsingItem(mc.player);
+                }
+
                 mc.interactionManager.attackEntity(mc.player, target);
                 mc.player.swingHand(Hand.MAIN_HAND);
+                
+                randomDelay = Math.random() * 3.0;
+                hitTicks = 0;
             }
         }
     }
 
-    // Математический расчет углов взгляда на точку
     private float[] calculateRotations(Vec3d from, Vec3d to) {
         double diffX = to.x - from.x;
         double diffY = to.y - from.y;
         double diffZ = to.z - from.z;
         double diffXZ = MathHelper.sqrt((float) (diffX * diffX + diffZ * diffZ));
-
         float yaw = (float) (MathHelper.atan2(diffZ, diffX) * 180.0 / Math.PI) - 90.0f;
         float pitch = (float) (-(MathHelper.atan2(diffY, diffXZ) * 180.0 / Math.PI));
-
         return new float[]{yaw, pitch};
     }
 
-    // Алгоритм плавного изменения угла (кинематика)
     private float smoothAngle(float current, float target, float speed) {
         float diff = MathHelper.wrapDegrees(target - current);
         if (diff > speed) diff = speed;
