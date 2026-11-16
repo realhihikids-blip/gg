@@ -1,53 +1,53 @@
 package com.pvpclient.module.visual;
 
-import com.pvpclient.module.Category;
 import com.pvpclient.module.ClientModule;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.item.Item;
-import net.minecraft.registry.Registries;
-import net.minecraft.screen.slot.SlotActionType;
-import net.minecraft.text.Text;
-import net.minecraft.util.Identifier;
+import com.pvpclient.module.Category;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.network.packet.s2c.play.PlayerListS2CPacket;
+import java.util.HashSet;
+import java.util.Set;
 
 public class VanishDetectorModule extends ClientModule {
 
-    private long lastNotifyTime = 0;
+    public static final Set<String> vanishedStaff = new HashSet<>();
+    public static int staffCount = 0;
 
     public VanishDetectorModule() {
-        // Меняем категорию на COMBAT, так как VISUAL в твоем чите называется иначе
-        super("VanishDetector+", "Палит админов в Ванише + Авто-Тотем при опасности", Category.COMBAT);
+        super("VanishDetector", "Показывает количество модераторов в Ванише", Category.VISUAL);
     }
 
     @Override
     public void onTick() {
-        if (!this.isActive() || mc.player == null || mc.world == null || mc.interactionManager == null) return;
+        if (!this.isEnabled()) {
+            vanishedStaff.clear();
+            staffCount = 0;
+            return;
+        }
+        staffCount = vanishedStaff.size();
+    }
 
-        // Прямое получение тотема по его ID из реестра игры для обхода ошибок маппинга
-        Item totemItem = Registries.ITEM.get(Identifier.of("minecraft", "totem_of_immortality"));
+    public static void onReceivePacket(Object packet) {
+        MinecraftClient mc = MinecraftClient.getInstance();
+        if (mc.world == null || mc.player == null) return;
 
-        // --- 1. ЛОГИКА АВТО-ТОТЕМА ---
-        if (mc.player.getOffHandStack().getItem() != totemItem && mc.player.getHealth() <= 14) {
-            PlayerInventory inv = mc.player.getInventory();
-            for (int i = 0; i < 45; i++) {
-                if (inv.getStack(i).getItem() == totemItem) {
-                    int slot = i < 9 ? i + 36 : i;
-                    mc.interactionManager.clickSlot(mc.player.currentScreenHandler.syncId, slot, 40, SlotActionType.SWAP, mc.player);
-                    break;
+        if (packet instanceof PlayerListS2CPacket listPacket) {
+            if (listPacket.getActions().contains(PlayerListS2CPacket.Action.REMOVE_PLAYER)) {
+                for (PlayerListS2CPacket.Entry entry : listPacket.getEntries()) {
+                    if (entry.profile() != null) {
+                        String profileName = entry.profile().getName();
+                        if (isStaffNickname(profileName)) {
+                            vanishedStaff.add(profileName);
+                        }
+                    }
                 }
             }
         }
+    }
 
-        // --- 2. ЛОГИКА ДЕТЕКТОРА ВАНИША ---
-        long currentTime = System.currentTimeMillis();
-        if (currentTime - lastNotifyTime > 7000) {
-            for (PlayerEntity player : mc.world.getPlayers()) {
-                if (player != mc.player && player.isInvisible() && mc.player.distanceTo(player) <= 25) {
-                    mc.player.sendMessage(Text.of("§c[Радар] ВНИМАНИЕ! Рядом обнаружен скрытый АДМИН в ванише!"), false);
-                    lastNotifyTime = currentTime;
-                    break;
-                }
-            }
-        }
+    private static boolean isStaffNickname(String name) {
+        if (name == null) return false;
+        String lower = name.toLowerCase();
+        return lower.contains("mod") || lower.contains("admin") || lower.contains("helper") 
+            || lower.contains("staff") || lower.contains("rw_") || lower.contains("ft_");
     }
 }

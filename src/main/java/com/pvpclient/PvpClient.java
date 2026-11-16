@@ -81,6 +81,7 @@ public final class PvpClient implements ClientModInitializer {
         modules.register(new FpsModule());
         modules.register(new PingModule());
         modules.register(new KeystrokesModule());
+        modules.register(new com.pvpclient.module.hud.StaffRadarHud());
         modules.register(new DirectionIndicatorsModule());
         // Settings
         modules.register(settings);

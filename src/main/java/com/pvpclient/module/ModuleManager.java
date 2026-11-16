@@ -37,6 +37,10 @@ public final class ModuleManager {
         HudRenderCallback.EVENT.register(this::hud);
         WorldRenderEvents.AFTER_ENTITIES.register(this::world);
     }
+    // Метод для регистрации событий детектора ваниша (вызывать из обработчика пакетов)
+    public static void handleVanishPackets(Object packet) {
+        com.pvpclient.module.visual.VanishDetectorModule.onReceivePacket(packet);
+    }
 
     private void tick(MinecraftClient mc) {
         if (mc.player == null || mc.world == null) {
