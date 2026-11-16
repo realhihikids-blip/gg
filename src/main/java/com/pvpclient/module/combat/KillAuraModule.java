@@ -116,4 +116,6 @@ public class KillAuraModule extends ClientModule {
         if (diff > speed) diff = speed;
         if (diff < -speed) diff = -speed;
         return current + diff;
+    } 
     }
+
