@@ -105,8 +105,15 @@ public class KillAuraModule extends ClientModule {
 
     private float smoothAngle(float current, float target, float speed) {
         float diff = MathHelper.wrapDegrees(target - current);
+        
+        // ГЛАВНЫЙ ФИКС БЛОКИРОВКИ МЫШКИ:
+        // Если вы резко дергаете мышкой сами (разница углов больше 60 градусов), 
+        // чит временно уступает вам управление, чтобы не блокировать ходьбу и обзор.
+        if (Math.abs(diff) > 60.0f) {
+            return current + (diff * 0.15f); // Легкая помощь в наведении вместо жесткого лока
+        }
+        
         if (diff > speed) diff = speed;
         if (diff < -speed) diff = -speed;
         return current + diff;
     }
-}
