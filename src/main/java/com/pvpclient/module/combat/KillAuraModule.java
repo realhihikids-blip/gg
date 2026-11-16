@@ -4,45 +4,45 @@ import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.util.Hand;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
-import com.pvpclient.module.ClientModule; // Импорт базового класса модуля
-import com.pvpclient.module.Category; // Импорт категорий, если нужно
+import com.pvpclient.module.ClientModule;
+import com.pvpclient.module.Category;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
 
 public class KillAuraModule extends ClientModule {
     
-    // Переменные для CameraMixin и Silent наводки
     public static boolean isActive = false;
     public static boolean hasTarget = false;
     public static float serverYaw;
     public static float serverPitch;
 
-    private final double maxReach = 2.92;
-    private final float rotationSpeed = 4.2f;
+    // Легитные настройки для ReallyWorld и FunTime
+    private final double maxReach = 2.82; // Безопасная дистанция, чтобы не кикало
+    private final float rotationSpeed = 6.5f; // Скорость плавной доводки прицела
     private AbstractClientPlayerEntity target;
     private int hitTicks = 0;
     private double randomDelay = 0;
 
-    // Конструктор модуля (исправляет ошибку регистрации)
     public KillAuraModule() {
         super("KillAura", "Автоматически бьет игроков вокруг", Category.COMBAT);
     }
-@Override
+
+    @Override
     public void onDisable() {
-        var mc = net.minecraft.client.MinecraftClient.getInstance();
-        if (mc.player != null) {
-            serverYaw = mc.player.getYaw();
-            serverPitch = mc.player.getPitch();
-        }
         isActive = false;
         hasTarget = false;
         target = null;
         super.onDisable();
     }
-    
+
     @Override
     public void onTick() {
+        if (!this.isEnabled()) {
+            isActive = false;
+            hasTarget = false;
+            return;
+        }
+
         hitTicks++;
         var mc = net.minecraft.client.MinecraftClient.getInstance();
         if (mc.world == null || mc.player == null) {
@@ -51,11 +51,11 @@ public class KillAuraModule extends ClientModule {
             return;
         }
 
-        // Ищем игроков с правильным типом данных Fabric
+        // Поиск целей в радиусе удара + запас на доводку
         List<AbstractClientPlayerEntity> targets = mc.world.getPlayers().stream()
                 .filter(p -> p != mc.player)
                 .filter(p -> p.isAlive())
-                .filter(p -> mc.player.distanceTo(p) <= maxReach + 1.0)
+                .filter(p -> mc.player.distanceTo(p) <= maxReach + 1.2)
                 .sorted(Comparator.comparingDouble(p -> mc.player.distanceTo(p)))
                 .toList();
 
@@ -70,20 +70,30 @@ public class KillAuraModule extends ClientModule {
         isActive = true;
         hasTarget = true;
 
-        // Расчет углов
+        // 1. Расчет чистых углов до хитбокса цели
         float[] neededRotations = calculateRotations(mc.player.getEyePos(), target.getBoundingBox().getCenter());
 
-        // Сглаживание
+        // 2. ВОЗВРАЩАЕМ НАВОДКУ: Считаем плавный человеческий поворот камеры
         float smoothYaw = smoothAngle(mc.player.getYaw(), neededRotations[0], rotationSpeed);
         float smoothPitch = smoothAngle(mc.player.getPitch(), neededRotations[1], rotationSpeed);
 
-        double noise = ThreadLocalRandom.current().nextGaussian() * 0.15;
-        serverYaw = smoothYaw + (float) noise;
-        serverPitch = MathHelper.clamp(smoothPitch + (float) noise, -90.0f, 90.0f);
+        // Реально поворачиваем самого игрока, чтобы прицел лип к врагу, а удары засчитывались сервером!
+        mc.player.setYaw(smoothYaw);
+        mc.player.setPitch(MathHelper.clamp(smoothPitch, -90.0f, 90.0f));
 
-        // Удар с обходом ReallyWorld
+        serverYaw = smoothYaw;
+        serverPitch = smoothPitch;
+
+        // 3. Строгая проверка угла перед ударом (Защита от киков за Hitboxes)
+        float deltaYaw = Math.abs(MathHelper.wrapDegrees(mc.player.getYaw() - neededRotations[0]));
+        float deltaPitch = Math.abs(MathHelper.wrapDegrees(mc.player.getPitch() - neededRotations[1]));
+
+        // Бьем только тогда, когда прицел реально долетел и находится на враге!
+        if (deltaYaw > 15.0f || deltaPitch > 15.0f) return;
+
+        // 4. Удар по кулдауну версии 1.21.4
         if (mc.player.distanceTo(target) <= maxReach) {
-            if (mc.player.getAttackCooldownProgress(0.5f) >= 0.95f && hitTicks >= (10 + randomDelay)) {
+            if (mc.player.getAttackCooldownProgress(0.5f) >= 0.95f && hitTicks >= (8 + randomDelay)) {
                 
                 if (mc.player.isUsingItem()) {
                     mc.interactionManager.stopUsingItem(mc.player);
@@ -92,7 +102,7 @@ public class KillAuraModule extends ClientModule {
                 mc.interactionManager.attackEntity(mc.player, target);
                 mc.player.swingHand(Hand.MAIN_HAND);
                 
-                randomDelay = Math.random() * 3.0;
+                randomDelay = Math.random() * 4.0;
                 hitTicks = 0;
             }
         }
