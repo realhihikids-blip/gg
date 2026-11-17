@@ -16,9 +16,9 @@ import java.util.List;
 
 public class CrystalAuraModule extends ClientModule {
 
-    private final double range = 4.0;             
-    private final double maxSelfDamage = 6.0;     
-    private final double minEnemyDamage = 10.0;   
+    private final double range = 4.2;             
+    private final double maxSelfDamage = 11.5;     
+    private final double minEnemyDamage = 6.0;   
     
     private int crystalTicks = 0;
 
