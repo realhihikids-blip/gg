@@ -62,6 +62,7 @@ public final class PvpClient implements ClientModInitializer {
         // Combat (practice mode, private worlds only)
         modules.register(new KillAuraModule());
         modules.register(new TriggerBotModule());
+        modules.register(new com.pvpclient.module.combat.CrystalAuraModule());
         TargetLockModule targetLock = new TargetLockModule();
         modules.register(targetLock);
         modules.register(new HitboxModule());
