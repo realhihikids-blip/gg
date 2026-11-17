@@ -16,10 +16,9 @@ import java.util.List;
 
 public class CrystalAuraModule extends ClientModule {
 
-    // НАСТРОЙКИ ОБХОДА И БЕЗОПАСНОСТИ ДЛЯ REALLYWORLD
-    private final double range = 4.0;             // Радиус работы чита
-    private final double maxSelfDamage = 6.0;     // МАКСИМАЛЬНЫЙ урон по себе (3 сердечка). Если больше — чит не поставит кристалл!
-    private final double minEnemyDamage = 10.0;   // МИНИМАЛЬНЫЙ урон по врагу (5 сердечек), при котором выгодно взрывать
+    private final double range = 4.0;             
+    private final double maxSelfDamage = 6.0;     
+    private final double minEnemyDamage = 10.0;   
     
     private int crystalTicks = 0;
 
@@ -35,7 +34,6 @@ public class CrystalAuraModule extends ClientModule {
         var mc = net.minecraft.client.MinecraftClient.getInstance();
         if (mc.world == null || mc.player == null || mc.interactionManager == null) return;
 
-        // 1. ПОИСК ВРАГА (Ближайший живой игрок)
         AbstractClientPlayerEntity enemy = mc.world.getPlayers().stream()
                 .filter(p -> p != mc.player && p.isAlive())
                 .min(Comparator.comparingDouble(p -> mc.player.distanceTo(p)))
@@ -43,7 +41,6 @@ public class CrystalAuraModule extends ClientModule {
 
         if (enemy == null || mc.player.distanceTo(enemy) > range + 2.0) return;
 
-        // 2. ЭТАП ВЗРЫВА (Если кристалл уже стоит рядом с врагом)
         EndCrystalEntity crystal = mc.world.getEntitiesByClass(EndCrystalEntity.class, 
                 new Box(enemy.getBlockPos()).expand(range), 
                 e -> e.isAlive() && mc.player.distanceTo(e) <= range)
@@ -51,12 +48,10 @@ public class CrystalAuraModule extends ClientModule {
                 .min(Comparator.comparingDouble(e -> mc.player.distanceTo(e)))
                 .orElse(null);
 
-        if (crystal != null && crystalTicks >= 2) { // Задержка в 2 тика (100 мс) — легитный обход Vulcan
-            // Считаем урон от этого кристалла перед ударом
+        if (crystal != null && crystalTicks >= 2) { 
             double selfDmg = calculateExplosionDamage(crystal.getPos(), mc.player);
             double enemyDmg = calculateExplosionDamage(crystal.getPos(), enemy);
 
-            // Взрываем только если это безопасно для нас и больно для врага
             if (selfDmg <= maxSelfDamage && enemyDmg >= minEnemyDamage) {
                 mc.interactionManager.attackEntity(mc.player, crystal);
                 mc.player.swingHand(Hand.MAIN_HAND);
@@ -65,8 +60,6 @@ public class CrystalAuraModule extends ClientModule {
             }
         }
 
-        // 3. ЭТАП УСТАНОВКИ (Если кристаллов нет, ищем куда поставить)
-        // Игрок должен держать Кристалл Края в руке
         boolean holdsCrystal = mc.player.getMainHandStack().getItem() == Items.END_CRYSTAL 
                             || mc.player.getOffHandStack().getItem() == Items.END_CRYSTAL;
         
@@ -75,26 +68,22 @@ public class CrystalAuraModule extends ClientModule {
         BlockPos bestPos = null;
         double bestEnemyDmg = 0;
 
-        // Сканируем блоки вокруг врага в радиусе range
         Iterable<BlockPos> blocks = BlockPos.iterate(
                 enemy.getBlockPos().add(-3, -2, -3), 
                 enemy.getBlockPos().add(3, 1, 3)
         );
 
         for (BlockPos pos : blocks) {
-            // Кристаллы можно ставить только на Обсидиан или Бедрок
             var blockType = mc.world.getBlockState(pos).getBlock();
             if (blockType == net.minecraft.block.Blocks.OBSIDIAN || blockType == net.minecraft.block.Blocks.BEDROCK) {
                 
-                // Проверяем, что блок сверху пустой
                 if (mc.world.isAir(pos.up())) {
-                    Vec3p crystalVec = new Vec3p(pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5);
+                    // ИСПРАВЛЕНО: Заменили Vec3p на Vec3d
+                    Vec3d crystalVec = new Vec3d(pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5);
                     
-                    // Считаем потенциальный урон взрыва по формуле
                     double selfDmg = calculateExplosionDamage(crystalVec, mc.player);
                     double enemyDmg = calculateExplosionDamage(crystalVec, enemy);
 
-                    // Умная фильтрация урона (ЗАЩИТА ОТ САМОУБИЙСТВА)
                     if (selfDmg <= maxSelfDamage && enemyDmg >= minEnemyDamage) {
                         if (enemyDmg > bestEnemyDmg) {
                             bestEnemyDmg = enemyDmg;
@@ -105,7 +94,6 @@ public class CrystalAuraModule extends ClientModule {
             }
         }
 
-        // Если нашли идеальный безопасный блок — ставим кристалл пакетом взаимодействия
         if (bestPos != null && crystalTicks >= 2) {
             Hand hand = mc.player.getMainHandStack().getItem() == Items.END_CRYSTAL ? Hand.MAIN_HAND : Hand.OFF_HAND;
             BlockHitResult hitResult = new BlockHitResult(
@@ -119,20 +107,15 @@ public class CrystalAuraModule extends ClientModule {
         }
     }
 
-    // МАТЕМАТИЧЕСКИЙ ПРОСЧЕТ УРОНА ВЗРЫВА (Симуляция физики Minecraft)
     private double calculateExplosionDamage(Vec3d crystalPos, net.minecraft.entity.LivingEntity entity) {
-        double distance = entity.distanceTo(new EndCrystalEntity(entity.world, crystalPos.x, crystalPos.y, crystalPos.z));
-        double maxDist = 12.0; // Максимальный радиус взрывной волны кристалла
+        // ИСПРАВЛЕНО: Используем entity.getWorld() вместо entity.world
+        double distance = entity.distanceTo(new EndCrystalEntity(entity.getWorld(), crystalPos.x, crystalPos.y, crystalPos.z));
+        double maxDist = 12.0; 
         
         if (distance > maxDist) return 0.0;
 
-        // Чем дальше сущность от эпицентра, тем меньше урон (Линейная интерполяция)
         double exposure = (maxDist - distance) / maxDist;
         double baseDamage = ((exposure * exposure + exposure) / 2.0) * 7.0 * 12.0 + 1.0;
-
-        // Учитываем броню и сложность (упрощенный легитный просчет для анархий)
-        double finalDamage = baseDamage * 0.3; // Среднее гашение урона за счет алмазной/незеритовой брони
-        
-        return finalDamage;
+        return baseDamage * 0.3; 
     }
 }
